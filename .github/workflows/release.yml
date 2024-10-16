@@ -1,0 +1,87 @@
+name: Python Package Release
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write  # Set permissions to allow writing to the repository
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}  # Use GITHUB_TOKEN for authentication
+
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.x'
+
+      - name: Install Poetry
+        run: curl -sSL https://install.python-poetry.org | python3 -
+
+      - name: Install dependencies
+        run: |
+          poetry install  # Install all dependencies, including dev dependencies
+
+      - name: Lint code
+        run: |
+          poetry run pre-commit run --all-files  # Run pre-commit checks
+
+      - name: Run tests
+        run: |
+          poetry run pytest  # Ensure tests pass before releasing
+
+      - name: Set up Git user for bump
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump version
+        id: bump_version
+        run: |
+          set +e  # Disable immediate exit on error
+          poetry run cz bump --yes
+          BUMP_EXIT_CODE=$?
+          if [ "$BUMP_EXIT_CODE" -eq 21 ]; then
+            echo "No eligible commits to bump, skipping this step."
+            exit 0  # Exit gracefully
+          elif [ "$BUMP_EXIT_CODE" -ne 0 ]; then
+            echo "Bump version failed with exit code $BUMP_EXIT_CODE."
+            exit $BUMP_EXIT_CODE  # Exit with the actual error code for any other error
+          fi
+        shell: bash
+
+      - name: Check for changes and push
+        run: |
+          if [ "$(git status --ahead-behind)" ]; then
+            git push origin main
+          else
+            echo "No changes to commit, skipping push."
+          fi
+
+      - name: Push new Git tag
+        run: |
+          NEW_VERSION=$(poetry version -s)
+          git fetch --tags  # Fetch all tags from the remote
+          # Check if the specific tag already exists on the remote
+          if git ls-remote --tags origin "v$NEW_VERSION" | grep "v$NEW_VERSION"; then
+            echo "Tag v$NEW_VERSION already exists, deleting it."
+            if git tag | grep "v$NEW_VERSION"; then
+              git tag -d "v$NEW_VERSION"  # Delete the local tag only if it exists
+            fi
+            git push origin --delete "v$NEW_VERSION" || echo "Tag not found on remote, skipping delete"  # Delete the tag from remote
+          fi
+          # Create the new tag and push it
+          git tag "v$NEW_VERSION"  # Create a new tag
+          git push origin "v$NEW_VERSION"  # Push the new tag
+
