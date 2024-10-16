@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "podcast_categorizer"
-version = "0.0.1"
+version = "0.1.0"
 description = "Library to categorize podcasts based on their description"
 authors = ["Somesh Garje <someshgarje@gmail.com>"]
 readme = "README.md"
@@ -18,7 +18,7 @@ black = "^24.10.0"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.0.1"
+version = "0.1.0"
 version_files = [
     "pyproject.toml:^version",
     "podcast_categorizer/_version.py"
